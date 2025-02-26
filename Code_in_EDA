@@ -1,0 +1,173 @@
+//design.sv
+
+module mux (
+  input  logic [15:0] i,  
+  input  logic [3:0] s,  
+  input  logic clk, rst,  
+  output reg y  
+);
+
+  always @(posedge clk or negedge clk) begin
+    if (rst==1) begin
+      assign y = 0;
+    end
+    else begin
+      assign y = i[s];
+    end
+  end
+endmodule
+
+//testbench.sv
+
+`include "runfile.sv"
+
+logic [15:0] i;   
+logic [3:0] s;  
+logic y;
+logic clk;
+logic rst;
+
+module mux_tb_top();
+  mux mux_inst (
+    .clk(clk),
+    .rst(rst),
+    .i(i),
+    .s(s),
+    .y(y)
+  );
+
+  initial begin
+    clk = 1'b1;
+    rst = 1'b1;
+    i = 16'b1111111111111111;  
+    s = 4'b1111; 
+  end  
+
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(1);
+  end
+
+  runfile run = new();
+  initial begin
+    run.runfile1();
+  end
+
+endmodule
+
+//clock.sv
+
+class clock;
+  task clk_gen();
+    $display("Clock generated");
+    forever #5 clk= ~clk;
+  endtask
+endclass
+
+//reset.sv
+
+class reset;
+  task rst_gen();
+    begin
+      #10 rst = 1'b0;
+    end
+  endtask
+endclass
+
+//stimulusg.sv
+
+class stimulusg;
+  task stimulus();
+    
+    repeat(25) begin
+      #5
+      i[0]  = $urandom_range(0,1);
+      i[1]  = $urandom_range(0,1);
+      i[2]  = $urandom_range(0,1);
+      i[3]  = $urandom_range(0,1);
+      i[4]  = $urandom_range(0,1);
+      i[5]  = $urandom_range(0,1);
+      i[6]  = $urandom_range(0,1);
+      i[7]  = $urandom_range(0,1);
+      i[8]  = $urandom_range(0,1);
+      i[9]  = $urandom_range(0,1);
+      i[10] = $urandom_range(0,1);
+      i[11] = $urandom_range(0,1);
+      i[12] = $urandom_range(0,1);
+      i[13] = $urandom_range(0,1);
+      i[14] = $urandom_range(0,1);
+      i[15] = $urandom_range(0,1);
+      s = $urandom_range(0, 15);
+    end 
+
+    #50 $finish;
+  endtask
+endclass
+
+//reset_test.sv
+
+class rst_test;
+  task rst_test1();
+    begin
+      #60 rst=~rst;
+      #10 rst=~rst;
+    end
+  endtask
+endclass
+
+//runfile.sv
+
+`include "clock.sv"
+`include "reset.sv"
+`include "stimulusg.sv"
+`include "rst_test.sv"
+`include "comparison.sv"
+
+class runfile;
+  task runfile1();
+    begin
+      clock cg=new();
+      reset rg=new();
+      stimulusg st=new();  
+      rst_test rt=new();
+      comparison c=new();
+      
+      fork
+        cg.clk_gen();
+        rg.rst_gen();
+        st.stimulus(); 
+        rt.rst_test1();
+        c.compare();
+      join
+       
+    end
+  endtask
+endclass
+
+//comparison.sv
+
+class comparison;
+  logic [15:0] exp_queue[$];  
+  logic out_queue[$];       
+  task compare();
+    repeat (25) begin
+      #5
+      if (rst == 1) begin
+        #1
+        if (y == 0) 
+          $display("clk=%0b, rst=%0b, i={%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d, %0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d}, s=%0d, y=%0d, time=%0t PASS 1", clk, rst, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7],i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], s, y, $time);
+        else 
+          $error("clk=%0b, rst=%0b, i={%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d, %0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d}, s=%0d, y=%0d, time=%0t FAIL 1", clk, rst, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7],i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], s, y, $time);
+        end 
+      else begin
+        exp_queue.push_back(i[s]); 
+        out_queue.push_back(y);     
+        if (exp_queue.pop_front() == out_queue.pop_front())
+          $display("clk=%0b, rst=%0b, i={%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d, %0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d}, s=%0d, y=%0d, time=%0t PASS 2",clk, rst, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7],i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], s, y, $time);
+        else 
+          $error("clk=%0b, rst=%0b, i={%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d, %0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d}, s=%0d, y=%0d, time=%0t FAIL 2",clk, rst, i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7],i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], s, y, $time);
+      end
+    end
+    #50 $finish;
+  endtask
+endclass
